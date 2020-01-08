@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pion/webrtc/v2"
+	"math/rand"
+	"strconv"
+	"strings"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/pion/webrtc/v2"
+	// "github.com/pion/webrtc/v2/examples/internal/signal"
 )
 
 func main() {
@@ -45,18 +48,39 @@ func main() {
 
 		// Register channel opening handling
 		d.OnOpen(func() {
-			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
+			fmt.Printf("Data channel '%s'-'%d' open. ", d.Label(), d.ID())
 
-			for range time.NewTicker(5 * time.Second).C {
-				message := signal.RandSeq(15)
-				fmt.Printf("Sending '%s'\n", message)
+			// for range time.NewTicker(5 * time.Second).C {
+			// 	message := signal.RandSeq(15)
+			// 	fmt.Printf("Sending '%s'\n", message)
+
+			// 	// Send the message as text
+			// 	sendTextErr := d.SendText(message)
+			// 	if sendTextErr != nil {
+			// 		panic(sendTextErr)
+			// 	}
+			// }
+
+			const DATASETS = 100000
+			var pow = [DATASETS]string{}
+			var startTime = time.Now().UnixNano()
+			for _, v := range pow {
+				// v = strings.Join(strings.Join(string(123), ","), string(rand.Intn(1000)))
+				v = strconv.FormatInt(time.Now().UnixNano(), 10)
+				var b strings.Builder
+				b.WriteString(v)
+				b.WriteString(",")
+				b.WriteString(strconv.FormatInt(int64(rand.Intn(1000)), 10))
+				// fmt.Printf("%d = %s\n", i, b.String())
 
 				// Send the message as text
-				sendTextErr := d.SendText(message)
+				sendTextErr := d.SendText(b.String())
 				if sendTextErr != nil {
 					panic(sendTextErr)
 				}
+				// fmt.Println(b.String())
 			}
+			fmt.Println("Sent ", DATASETS, " data events in ", (float64(time.Now().UnixNano())-float64(startTime))/float64(1000000000), "s")
 		})
 
 		// Register text message handling
@@ -101,6 +125,12 @@ func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription,
 	answerIn = make(chan webrtc.SessionDescription)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		setupResponse(&w, r)
+		if (*r).Method == "OPTIONS" {
+			return
+		}
+
 		var offer webrtc.SessionDescription
 		err := json.NewDecoder(r.Body).Decode(&offer)
 		if err != nil {
@@ -122,4 +152,10 @@ func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription,
 	fmt.Println("Listening on", address)
 
 	return
+}
+
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
